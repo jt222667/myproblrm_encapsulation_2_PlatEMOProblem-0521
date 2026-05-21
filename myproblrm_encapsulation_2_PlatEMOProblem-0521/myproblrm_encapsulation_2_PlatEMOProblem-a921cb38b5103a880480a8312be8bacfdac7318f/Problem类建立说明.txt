@@ -1,0 +1,42 @@
+《将my_problem（模块化机器人构型拓扑优化问题）转换为PlatEMO_v2.2.1平台能够处理的Problem类要求说明书》
+
+一.决策变量定义：决策变量 x = [n, module, install, align, sequence]
+1.n为模块数，module为模块编号，install为安装方向，align为对齐角，sequence为拓扑链接参数，
+2.名义决策变量为 x 的维度为1+4*13=40，n维度为1，module, install, align, sequence四个数组的维度都是13；
+3.名义决策变量为 x 的所有元素的参数类型都是整数型，名义决策变量边界如下:
+(1) n的上界n.ub=13,下界n.lb=3，
+n.lb=3的来源依据： 在符合is_valid_expanded_config_debug.m规则的前提下，模块数量最小的情况为2个集成模块+1个关节模块，满足关节数量为7；
+n.ub=13的来源依据：在符合is_valid_expanded_config_debug.m规则的前提下，模块数量最大的情况为7个关节模块+6个连杆模块，满足关节数量为7。
+(2) module的上界module.ub=10,下界module.lb=1；
+(3) install的上界install.ub=1,下界install.lb=0；
+(4) align的上界align.ub=2,下界align.lb=0。
+【重要】为简化计算，固定install始终为1（即install.ub=install.lb=1）；
+固定align始终为0（即align.ub=align.lb=0）；
+将sequence为拓扑链接参数固定为单分支拓扑，即sequence = [0,1,2,3,4,5,6,7,8,9,10,11,12]。
+4.【极其重要】因为大部分MOEA算法不支持决策变量维度发生变化，因此固定决策变量 x 的名义维度为40，
+但在实际计算过程中，实际使用到的决策变量x_real维度为1 + 4*n，表示为 x_real = [n, module_real, install_real, align_real, sequence_real]，
+其中，module_real = module(1:n),install_real = install(1:n),align_real = align(1:n),sequence_real = sequence(1:n)。
+最终x_real在expand_module_units()中进行拓扑展开与合法性判定，得到展开后的module_out, install_out, align_out, sequence_out，
+并作为LP的输入决定机器人构型，即LP=LP_generate(module_out, install_out, align_out, sequence_out, RP_data)。
+
+二.优化目标设计
+1.优化目标一：机器人末端可操作度目标w_all，优化目标是找到w_all达到最大的构型 x1 pareto集合
+求解函数为[SV_all, flag_all, q_all, w_all] =  SQP_all(LP, SV, Goal),函数作用是在机器人构型参数SV、LP都确定的情况下，逐分支计算使该分支在目标点处且可操作度最大的关节角组合q_k,得到
+该分支的最大定位误差w_k，最后整合整个机器人的关节角组合得到q_all = [q_1,q_2,...],q_all为下一项目标计算备用。以及得到整个机器人所有分支的最大可操作度之和w_all，即优化目标一。
+2.优化目标二：机器人末端最大定位误差目标sig_worst，优化目标是找到sig_worst达到最小的构型 x2 pareto集合
+求解函数为[q_worst, sig_worst, info] = fast_sqpji_worst_dhpara(SV, LP, k, opts)，在计算完成优化目标一后，使用经过q_sol更新的状态参数SV（即如果需要计算优化目标二，
+也需要先获取[SV, flag, q_sol,err_sol, w] = SQP_main(LP, SV, Goal)的计算结果q_sol）,计算在不同dh参数组合下机器人第k条分支末端最大定位误差sig_worst，sig_worst也已经做了标量化处理。
+如果是SV.m>1,则需对k=1:SV.m的每条分支求sig_worst_k并求和作为最终sig_worst_k。
+3.优化目标三：机器人使用模块数量num_1，优化目标是找到num_1达到最小的构型 x3 pareto集合
+最简单，直接取决策变量中的参数n即可:num_1 = n。
+4.优化目标四：机器人使用展开后的模块数量目标num_2，优化目标是找到num_2达到最小的构型 x3 pareto集合
+求解函数为[module_out, install_out, align_out, sequence_out, num_modules_physical, is_valid, err] = expand_module_units(module_real, install_real, align_real, sequence_real, RP_data)，
+则num_2 = num_modules_physical。
+
+三.注意事项
+【重要】在此前“一.决策变量定义”中的第3点中提到过is_valid_expanded_config_debug.m，这是一个对实际的决策变量x_real
+进行预处理的函数，[is_valid, err] = is_valid_expanded_config_debug(module_var, install_var, RP_data)，如果is_valid=true,
+说明x_real合法，进而才继续计算“二.优化目标设计”中的各项优化目标；如果is_valid=false,说明x_real不合法，直接赋予各项优化目标为惩罚值，
+不再消耗算力和时间对其进行计算。
+
+
