@@ -24,16 +24,19 @@ sequence_real =   sequence(1:n);
 %% 机器人初始化
 LP = LP_generate(module_out, install_out, align_out, sequence_out, RP_data);
 SV = SV_generate(LP);
-q = 0.5*pi*ones(1,LP.num_q);
-SV = Trans_aa_pos_ori(LP,SV,q);
-PlotSV(LP,SV);
+% q = 0.5*pi*ones(1,LP.num_q);
+% SV = Trans_aa_pos_ori(LP,SV,q);
+% PlotSV(LP,SV);
 
 %% 目标点设置，此处为偷懒采用正运动学设置
 Goal = Goal_init(SV);
-Goal.change = [1 1 1];
+Goal.change = [1 0 0];
+Goal.POS_e{1} = [1 0 0.1];
+Goal.ORI_e{1} = cy(0.5*pi);
 
 %% 求优化目标1：机器人末端最大可操作度
 [SV_all, flag_all, q_all, w_all] =  SQP_all(LP, SV, Goal);
+PlotSV(LP,SV_all);
 
 %% 求优化目标2：机器人末端最大定位误差
 sig_worst_all2 = calc_sig_worst_all(SV_all, LP);

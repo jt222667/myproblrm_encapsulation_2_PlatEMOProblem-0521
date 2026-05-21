@@ -2,7 +2,7 @@
 
 function [SV, flag, q_k, err_k, w_k] = SQP_main(LP, SV, Goal, k)
 
-num_trials = 100;
+num_trials = 500;
 reach_tol = 1e-4;
 
 q_lb = zeros(LP.num_q,1);
